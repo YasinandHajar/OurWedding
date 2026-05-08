@@ -17,6 +17,11 @@ body {
   color: #6b1f2b;
   font-family: Georgia, serif;
   overflow-x: hidden;
+  visibility: hidden; /* hide until fonts ready */
+}
+
+body.fonts-ready {
+  visibility: visible;
 }
 
 body.locked { overflow: hidden; }
@@ -273,7 +278,44 @@ button {
 button:hover { opacity: 0.85; }
 .hidden { display: none; }
 
-/* ── MOBILE ── */
+/* ── TAP TO START OVERLAY ── */
+#tap-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: opacity 0.6s ease;
+  background: transparent;
+}
+#tap-overlay span {
+  color: white;
+  font-family: 'Imperial Script', cursive;
+  font-size: 3rem;
+  text-align: center;
+  padding: 20px;
+  text-shadow: 0 2px 12px rgba(0,0,0,0.6);
+  animation: tapPulse 2s ease-in-out infinite;
+}
+@keyframes tapPulse {
+  0%, 100% { opacity: 0.5; }
+  50%       { opacity: 1.0; }
+}
+
+/* ── FLORAL DIVIDER ── */
+.floral-divider {
+  text-align: center;
+  margin: 40px auto 10px;
+  color: #6b1f2b;
+  font-size: 2rem;
+  opacity: 0.7;
+  line-height: 1;
+  letter-spacing: 6px;
+}
+
+
 @media (max-width: 768px) {
   .names-block h1 { font-size: 2.8rem; }
   .names-block p  { font-size: 3.2rem; }
@@ -288,11 +330,14 @@ button:hover { opacity: 0.85; }
 
 <body class="locked">
 
-<!-- VIDEO INTRO -->
+<!-- TAP TO START + VIDEO INTRO combined -->
 <div id="intro">
-  <video id="startupVideo" autoplay muted playsinline>
+  <video id="startupVideo" muted playsinline>
     <source src="startup.mp4" type="video/mp4">
   </video>
+  <div id="tap-overlay">
+    <span>Tap to Begin</span>
+  </div>
 </div>
 
 <!-- ══════════════════════════════
@@ -321,6 +366,7 @@ button:hover { opacity: 0.85; }
   <h1>Yasin &amp; Hajar</h1>
   <p data-i18n="tagline">We are getting married!</p>
   <p class="invitation" data-i18n="invitation">With joyful hearts, we invite you to celebrate the union of the Erkılıç and Rashidi families.</p>
+  <div class="floral-divider">❧ ✿ ❧</div>
 </section>
 
 <!-- ══════════════════════════════
@@ -537,42 +583,54 @@ function setLanguage(lang) {
   document.documentElement.dir = (lang === "fa") ? "rtl" : "ltr";
 }
 
-/* ── VIDEO INTRO ─────────────────────────────────────────── */
+/* ── FONT READY — show body only after fonts load ── */
+document.fonts.ready.then(() => {
+  document.body.classList.add("fonts-ready");
+});
+
+/* ── TAP TO START ─────────────────────────────────────────── */
+const tapOverlay = document.getElementById("tap-overlay");
 const video = document.getElementById("startupVideo");
-let unmuted = false;
 let introDone = false;
 
-video.addEventListener("timeupdate", () => {
+function dismissIntro() {
+  if (introDone) return;
+  introDone = true;
+  const intro = document.getElementById("intro");
+  intro.style.opacity = "0";
+  document.body.classList.remove("locked");
+  setTimeout(() => {
+    intro.style.display = "none";
+    // Keep video alive off-screen so audio continues playing
+    video.style.position = "fixed";
+    video.style.top = "-9999px";
+    video.style.left = "-9999px";
+    video.style.width = "1px";
+    video.style.height = "1px";
+    video.style.pointerEvents = "none";
+    document.body.appendChild(video);
+  }, 1500);
+}
 
-  // Unmute at 0.01s so music starts as early as possible
-  if (video.currentTime >= 0.01 && !unmuted) {
-    unmuted = true;
-    video.muted = false;
-    video.volume = 1;
-  }
+tapOverlay.addEventListener("click", () => {
+  // Fade out just the tap prompt — video underneath becomes visible
+  tapOverlay.style.opacity = "0";
+  tapOverlay.style.pointerEvents = "none";
 
-  // At 2.38s, fade out the visual intro and unlock the page
-  if (video.currentTime >= 2.38 && !introDone) {
-    introDone = true;
-    const intro = document.getElementById("intro");
+  // Play with full audio — allowed because this is inside a real user click
+  video.muted = false;
+  video.volume = 1;
+  video.play();
 
-    intro.style.opacity = "0";
-    document.body.classList.remove("locked");
+  // At 2.82s the envelope animation ends — fade the whole intro out
+  video.addEventListener("timeupdate", () => {
+    if (video.currentTime >= 2.82) dismissIntro();
+  });
 
-    setTimeout(() => {
-      intro.style.display = "none";
-
-      // Move video off-screen so audio keeps playing in background
-      video.style.position = "fixed";
-      video.style.top = "-9999px";
-      video.style.left = "-9999px";
-      video.style.width = "1px";
-      video.style.height = "1px";
-      video.style.pointerEvents = "none";
-      document.body.appendChild(video);
-
-    }, 1500);
-  }
+  video.addEventListener("ended", dismissIntro);
+  video.addEventListener("error", dismissIntro);
+  // Safety fallback after full song length
+  setTimeout(dismissIntro, 45000);
 });
 
 /* ── COUNTDOWN ───────────────────────────────────────────── */
