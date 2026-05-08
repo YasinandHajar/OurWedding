@@ -515,14 +515,41 @@ function setLanguage(lang) {
 
 /* ── VIDEO INTRO ─────────────────────────────────────────── */
 const video = document.getElementById("startupVideo");
-video.onended = () => {
-  const intro = document.getElementById("intro");
-  intro.style.opacity = "0";
-  setTimeout(() => {
-    intro.style.display = "none";
+let unmuted = false;
+let introDone = false;
+
+video.addEventListener("timeupdate", () => {
+
+  // Unmute at 0.01s so music starts as early as possible
+  if (video.currentTime >= 0.01 && !unmuted) {
+    unmuted = true;
+    video.muted = false;
+    video.volume = 1;
+  }
+
+  // At 2.82s, fade out the visual intro and unlock the page
+  if (video.currentTime >= 2.82 && !introDone) {
+    introDone = true;
+    const intro = document.getElementById("intro");
+
+    intro.style.opacity = "0";
     document.body.classList.remove("locked");
-  }, 1500);
-};
+
+    setTimeout(() => {
+      intro.style.display = "none";
+
+      // Move video off-screen so audio keeps playing in background
+      video.style.position = "fixed";
+      video.style.top = "-9999px";
+      video.style.left = "-9999px";
+      video.style.width = "1px";
+      video.style.height = "1px";
+      video.style.pointerEvents = "none";
+      document.body.appendChild(video);
+
+    }, 1500);
+  }
+});
 
 /* ── COUNTDOWN ───────────────────────────────────────────── */
 const weddingDate = new Date("August 10, 2026 00:00:00").getTime();
